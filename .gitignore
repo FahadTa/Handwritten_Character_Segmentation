@@ -1,0 +1,139 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual Environment
+venv/
+env/
+ENV/
+charseg/
+.venv
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# CRITICAL: Exclude all generated data and outputs
+outputs/
+!outputs/.gitkeep
+
+# Fonts (if large or proprietary - keep only if open source and small)
+# Uncomment if fonts are too large
+# fonts/
+
+# Dataset and training artifacts
+data/
+datasets/
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+
+# Model weights and checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+checkpoints/
+weights/
+models/*.pth
+models/*.pt
+
+# Logs and experiment tracking
+logs/
+*.log
+runs/
+wandb/
+mlruns/
+.wandb/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Cached files
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Environment variables (may contain secrets)
+.env
+.env.local
+.env.*.local
+
+# Compiled translations
+*.mo
+
+# Secrets and credentials
+*.pem
+*.key
+secrets/
+credentials/
+
+# Large media files
+*.mp4
+*.avi
+*.mov
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.pdf
+
+# Compressed files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# System files
+Thumbs.db
+Desktop.ini

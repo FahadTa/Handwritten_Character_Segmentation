@@ -1,0 +1,239 @@
+# Handwritten Character Segmentation - Configuration File
+
+# Project Metadata
+project:
+  name: "handwritten_char_segmentation"
+  version: "1.0.0"
+  description: "Synthetic handwritten character segmentation using deep learning"
+  seed: 42
+
+# Paths
+paths:
+  fonts_dir: "fonts"
+  output_dir: "outputs"
+  synthetic_data_dir: "outputs/synthetic_data"
+  images_dir: "outputs/synthetic_data/images"
+  masks_dir: "outputs/synthetic_data/masks"
+  metadata_dir: "outputs/synthetic_data/metadata"
+  checkpoints_dir: "outputs/checkpoints"
+  logs_dir: "outputs/logs"
+  predictions_dir: "outputs/predictions"
+
+# Dataset Generation
+dataset_generation:
+  num_samples: 10000
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  
+  # Image parameters
+  image_size: [1024, 1024]  # [height, width]
+  background_color: [255, 255, 255]  # White background
+  text_color_range: [[0, 0, 0], [50, 50, 50]]  # Dark text range
+  
+  # Text parameters
+  min_chars_per_image: 20
+  max_chars_per_image: 100
+  font_size_range: [24, 48]
+  line_spacing_range: [1.2, 1.8]
+  char_spacing_range: [0, 5]  # Additional pixel spacing between chars
+  
+  # Layout parameters
+  margin: [50, 50]  # [vertical, horizontal] margins
+  max_lines_per_image: 10
+  text_alignment: "left"  # left, center, right, justify
+  
+  # Character classes
+  character_set: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,!?;:'-() "
+  include_background_class: true
+  
+  # Mask generation
+  mask_method: "bounding_box"  # template_matching or bounding_box
+  template_matching_threshold: 0.7
+  mask_dilation_kernel: 3  # Kernel size for mask dilation
+
+# Text Corpus
+text_corpus:
+  source: "wikipedia"  # wikipedia, custom, mixed
+  wikipedia_articles: 100
+  wikipedia_language: "en"
+  custom_text_file: null
+  min_sentence_length: 5
+  max_sentence_length: 20
+
+# Data Augmentation
+augmentation:
+  enabled: true
+  probability: 0.8
+  
+  # Geometric augmentations
+  geometric:
+    rotation_range: [-5, 5]  # degrees
+    scale_range: [0.95, 1.05]
+    shear_range: [-5, 5]  # degrees
+    translate_percent: 0.05
+    elastic_transform:
+      alpha: 50
+      sigma: 5
+  
+  # Photometric augmentations
+  photometric:
+    brightness_range: [0.8, 1.2]
+    contrast_range: [0.8, 1.2]
+    saturation_range: [0.9, 1.1]
+    hue_range: [-0.05, 0.05]
+    gamma_range: [0.9, 1.1]
+  
+  # Noise and blur
+  noise_blur:
+    gaussian_noise_var: [0, 0.01]
+    gaussian_blur_sigma: [0, 1.5]
+    motion_blur_kernel: [3, 7]
+  
+  # Document-specific augmentations
+  document:
+    paper_texture: true
+    ink_bleed: true
+    shadow: true
+    fold_lines: false
+
+# Model Architecture
+model:
+  architecture: "unet"  # unet, swin_unet
+  
+  # U-Net parameters
+  unet:
+    encoder_channels: [64, 128, 256, 512, 1024]
+    decoder_channels: [512, 256, 128, 64]
+    num_classes: 64  # 63 characters + background
+    encoder_depth: 5
+    use_batch_norm: true
+    use_dropout: true
+    dropout_rate: 0.3
+    activation: "relu"  # relu, leaky_relu, elu
+  
+  # Swin-UNet parameters
+  swin_unet:
+    embed_dim: 96
+    depths: [2, 2, 6, 2]
+    num_heads: [3, 6, 12, 24]
+    window_size: 7
+    mlp_ratio: 4.0
+    qkv_bias: true
+    drop_rate: 0.0
+    attn_drop_rate: 0.0
+    drop_path_rate: 0.1
+    num_classes: 64
+
+# Training
+training:
+  # Basic parameters
+  batch_size: 8
+  num_epochs: 100
+  num_workers: 4
+  pin_memory: true
+  
+  # Optimizer
+  optimizer:
+    name: "adamw"  # adam, adamw, sgd
+    learning_rate: 0.001
+    weight_decay: 0.0001
+    betas: [0.9, 0.999]
+    momentum: 0.9  # for SGD
+  
+  # Learning rate scheduler
+  scheduler:
+    name: "cosine"  # step, cosine, plateau, onecycle
+    step_size: 30  # for step scheduler
+    gamma: 0.1
+    patience: 10  # for plateau scheduler
+    min_lr: 0.000001
+  
+  # Loss function
+  loss:
+    name: "combined"  # dice, ce, combined, focal
+    dice_weight: 0.5
+    ce_weight: 0.5
+    focal_alpha: 0.25
+    focal_gamma: 2.0
+    class_weights: null  # Will be computed from dataset
+  
+  # Gradient clipping
+  gradient_clip_val: 1.0
+  
+  # Mixed precision training
+  use_amp: true
+  
+  # Early stopping
+  early_stopping:
+    enabled: true
+    monitor: "val_iou"
+    patience: 15
+    mode: "max"
+    min_delta: 0.001
+
+# Validation
+validation:
+  check_val_every_n_epoch: 1
+  val_batch_size: 8
+  
+  # Metrics to track
+  metrics:
+    - "iou"
+    - "dice"
+    - "pixel_accuracy"
+    - "precision"
+    - "recall"
+    - "f1"
+
+# Logging
+logging:
+  # Weights & Biases
+  wandb:
+    enabled: true
+    project: "handwritten-char-segmentation"
+    entity: null  # Your W&B username/team
+    log_model: true
+    log_frequency: 100  # steps
+    log_images: true
+    num_images_to_log: 8
+  
+  # Local logging
+  local:
+    log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+    save_frequency: 1  # epochs
+  
+  # Checkpointing
+  checkpoint:
+    save_top_k: 3
+    monitor: "val_iou"
+    mode: "max"
+    save_last: true
+
+# Inference
+inference:
+  batch_size: 4
+  tta: false  # Test-time augmentation
+  confidence_threshold: 0.5
+  min_char_size: 10  # Minimum pixels for a character
+  nms_threshold: 0.5  # Non-maximum suppression
+
+# Hyperparameter Tuning
+hyperparameter_tuning:
+  enabled: false
+  method: "optuna"  # optuna, wandb_sweep
+  n_trials: 50
+  
+  # Search space
+  search_space:
+    learning_rate: [0.0001, 0.01]
+    batch_size: [4, 8, 16]
+    encoder_depth: [4, 5]
+    dropout_rate: [0.1, 0.5]
+
+# Hardware
+hardware:
+  device: "cuda"  # cuda, cpu, mps
+  gpu_ids: [0]
+  distributed: false
+  precision: 16  # 16, 32
