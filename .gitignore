@@ -55,9 +55,7 @@ outputs/
 # Uncomment if fonts are too large
 # fonts/
 
-# Dataset and training artifacts
-data/
-datasets/
+# Models File
 *.h5
 *.hdf5
 *.pkl
