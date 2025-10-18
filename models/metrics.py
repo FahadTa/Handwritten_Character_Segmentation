@@ -1,5 +1,5 @@
 """
-Evaluation metrics.
+Evaluation metrics for character instance segmentation.
 Implements IoU, Dice, Pixel Accuracy, Precision, Recall, and F1 Score.
 """
 
@@ -225,6 +225,8 @@ def compute_iou(
     if predictions.dim() == 4:
         predictions = torch.argmax(predictions, dim=1)
     
+    targets = targets.clamp(0, num_classes - 1)
+    
     if ignore_index >= 0:
         mask = targets != ignore_index
         predictions = predictions * mask
@@ -279,6 +281,8 @@ def compute_dice(
     if predictions.dim() == 4:
         predictions = torch.argmax(predictions, dim=1)
     
+    targets = targets.clamp(0, num_classes - 1)
+    
     if ignore_index >= 0:
         mask = targets != ignore_index
         predictions = predictions * mask
@@ -326,6 +330,8 @@ def compute_pixel_accuracy(
     """
     if predictions.dim() == 4:
         predictions = torch.argmax(predictions, dim=1)
+        num_classes = predictions.shape[1] if predictions.dim() == 4 else 64
+        targets = targets.clamp(0, num_classes - 1)
     
     if ignore_index >= 0:
         mask = targets != ignore_index

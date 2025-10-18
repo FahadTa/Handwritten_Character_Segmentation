@@ -8,6 +8,7 @@ import argparse
 import warnings
 from pathlib import Path
 from datetime import datetime
+from typing import Optional, Dict, Any
 
 import torch
 import pytorch_lightning as pl
@@ -51,7 +52,12 @@ def setup_wandb_logger(config: dict, run_name: Optional[str] = None) -> Optional
         save_dir=config.get('paths', {}).get('logs_dir', 'outputs/logs')
     )
     
-    logger.experiment.config.update(config)
+    try:
+        import wandb
+        if wandb.run is not None:
+            wandb.config.update(config, allow_val_change=True)
+    except Exception as e:
+        print(f"Warning: Could not update wandb config: {e}")
     
     return logger
 
@@ -154,13 +160,13 @@ def train(
     
     pl.seed_everything(config.get('project.seed'), workers=True)
     
-    datamodule = create_datamodule(config)
+    datamodule = create_datamodule(config.to_dict())
     datamodule.prepare_data()
     datamodule.setup(stage='fit')
     
     model = CharacterSegmentationModule(config.to_dict())
     
-    logger = setup_wandb_logger(config, run_name)
+    logger = setup_wandb_logger(config.to_dict(), run_name)
     
     callbacks = create_callbacks(config.to_dict())
     
@@ -192,8 +198,8 @@ def train(
         gradient_clip_val=config.get('training.gradient_clip_val'),
         log_every_n_steps=50,
         check_val_every_n_epoch=config.get('validation.check_val_every_n_epoch'),
-        deterministic=True,
-        benchmark=False,
+        deterministic=False,
+        benchmark=True,
         enable_progress_bar=True,
         enable_model_summary=True
     )

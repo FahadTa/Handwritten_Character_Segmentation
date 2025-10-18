@@ -1,5 +1,5 @@
 """
-Loss functions
+Loss functions for character instance segmentation.
 Implements Dice, Cross-Entropy, Combined, and Focal losses.
 """
 
@@ -53,8 +53,10 @@ class DiceLoss(nn.Module):
         
         predictions = F.softmax(predictions, dim=1)
         
+        targets = targets.long().clamp(0, num_classes - 1)
+        
         targets_one_hot = F.one_hot(
-            targets.clamp(0, num_classes - 1), 
+            targets, 
             num_classes=num_classes
         )
         targets_one_hot = targets_one_hot.permute(0, 3, 1, 2).float()
@@ -126,6 +128,9 @@ class FocalLoss(nn.Module):
         Returns:
             Focal loss value
         """
+        num_classes = predictions.shape[1]
+        targets = targets.long().clamp(0, num_classes - 1)
+        
         ce_loss = F.cross_entropy(
             predictions,
             targets,
@@ -201,6 +206,9 @@ class CombinedLoss(nn.Module):
         Returns:
             Combined loss value
         """
+        num_classes = predictions.shape[1]
+        targets = targets.long().clamp(0, num_classes - 1)
+        
         dice = self.dice_loss(predictions, targets)
         ce = self.ce_loss(predictions, targets)
         
@@ -253,11 +261,17 @@ class TverskyLoss(nn.Module):
             Tversky loss value
         """
         num_classes = predictions.shape[1]
+        targets = targets.long().clamp(0, num_classes - 1)
         
         predictions = F.softmax(predictions, dim=1)
         
         targets_one_hot = F.one_hot(
-            targets.clamp(0, num_classes - 1),
+            targets,
+            num_classes=num_classes
+        )
+        
+        targets_one_hot = F.one_hot(
+            targets.long().clamp(0, num_classes - 1),
             num_classes=num_classes
         )
         targets_one_hot = targets_one_hot.permute(0, 3, 1, 2).float()
