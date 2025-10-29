@@ -60,8 +60,20 @@ class PostProcessor:
         
         if apply_morphology:
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-            refined_mask = cv2.morphologyEx(refined_mask, cv2.MORPH_CLOSE, kernel)
-            refined_mask = cv2.morphologyEx(refined_mask, cv2.MORPH_OPEN, kernel)
+            
+            unique_instances = np.unique(refined_mask)
+            temp_mask = np.zeros_like(refined_mask)
+            
+            for instance_id in unique_instances:
+                if instance_id == 0:
+                    continue
+                
+                instance_mask = (refined_mask == instance_id).astype(np.uint8)
+                instance_mask = cv2.morphologyEx(instance_mask, cv2.MORPH_CLOSE, kernel)
+                instance_mask = cv2.morphologyEx(instance_mask, cv2.MORPH_OPEN, kernel)
+                temp_mask[instance_mask > 0] = instance_id
+            
+            refined_mask = temp_mask
         
         if fill_holes:
             refined_mask = self._fill_holes_all_instances(refined_mask)
@@ -94,7 +106,15 @@ class PostProcessor:
         for instance_id in unique_ids:
             instance_mask = (mask == instance_id).astype(np.uint8)
             
-            props = measure.regionprops(instance_mask)[0]
+            if instance_mask.sum() == 0:
+                continue
+            
+            props = measure.regionprops(instance_mask)
+            
+            if len(props) == 0:
+                continue
+            
+            props = props[0]
             
             area = props.area
             if area < self.min_area or area > self.max_area:
