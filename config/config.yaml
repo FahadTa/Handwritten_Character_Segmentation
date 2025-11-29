@@ -88,7 +88,7 @@ dataset_generation:
   val_split: 0.1
 hardware:
   device: cuda
-  distributed: true
+  distributed: false
   gpu_ids:
   - 0
   - 1
@@ -135,7 +135,7 @@ model:
     - 512
     - 1024
     encoder_depth: 5
-    num_classes: 64
+    num_classes: 75
     use_batch_norm: true
     use_dropout: true
 paths:
@@ -149,8 +149,7 @@ paths:
   predictions_dir: outputs/predictions
   synthetic_data_dir: outputs/synthetic_data
 project:
-  description: Instance-level segmentation of handwritten characters using synthetic
-    data
+  description: Semantic segmentation of handwritten characters using synthetic data
   name: handwritten_char_segmentation
   seed: 42
   version: 1.0.0
@@ -165,7 +164,7 @@ training:
   batch_size: 2
   early_stopping:
     enabled: true
-    min_delta: 0.0005
+    min_delta: 0.001
     mode: max
     monitor: val_iou_epoch
     patience: 20
@@ -176,14 +175,14 @@ training:
     dice_weight: 0.5
     focal_alpha: 0.75
     focal_gamma: 2.5
-    name: dice
+    name: combined
   num_epochs: 100
   num_workers: 2
   optimizer:
     betas:
     - 0.9
     - 0.999
-    learning_rate: 0.001
+    learning_rate: 0.0003
     momentum: 0.9
     name: adamw
     weight_decay: 0.0001

@@ -21,8 +21,13 @@ class MaskGenerationConfig:
 
 class MaskGenerator:
     """
-    Generates pixel-perfect segmentation masks for character-level instance segmentation.
-    Each character occurrence gets a unique instance ID.
+    Generates pixel-perfect segmentation masks for character-level SEMANTIC segmentation.
+    Each character TYPE (not occurrence) gets a unique class ID.
+    
+    SEMANTIC SEGMENTATION APPROACH:
+    - All 'A' characters get the same class ID
+    - All 'B' characters get the same class ID
+    - This matches the U-Net architecture which outputs num_classes channels
     """
     
     def __init__(
@@ -43,10 +48,17 @@ class MaskGenerator:
         self.image_size = image_size
         self.config = config or MaskGenerationConfig()
         
+        # CRITICAL: Map each character to its CLASS ID (not instance ID)
+        # Background = 0, Characters start from 1
         self.char_to_id = {char: idx + 1 for idx, char in enumerate(character_set)}
-        self.char_to_id[' '] = 0
+        self.char_to_id[' '] = 0  # Space is background
         
         self.num_classes = len(self.char_to_id)
+        
+        print(f"MaskGenerator initialized:")
+        print(f"  - Character set size: {len(character_set)}")
+        print(f"  - Number of classes: {self.num_classes} (including background)")
+        print(f"  - Method: {self.config.method}")
     
     def generate_mask_from_annotations(
         self,
@@ -56,8 +68,8 @@ class MaskGenerator:
         font_size: int
     ) -> np.ndarray:
         """
-        Generate instance segmentation mask from character annotations.
-        Each character gets a unique instance ID based on its position.
+        Generate SEMANTIC segmentation mask from character annotations.
+        Each character TYPE gets the same class ID across the entire image.
         
         Args:
             image: Original image as numpy array (H, W, 3)
@@ -66,7 +78,7 @@ class MaskGenerator:
             font_size: Font size used in image
             
         Returns:
-            Instance segmentation mask (H, W) with unique IDs per character
+            Semantic segmentation mask (H, W) with class IDs
         """
         if self.config.method == "template_matching":
             return self._generate_mask_template_matching(
@@ -83,15 +95,15 @@ class MaskGenerator:
         annotations: List[Dict]
     ) -> np.ndarray:
         """
-        Generate instance mask using bounding box method.
-        Each character gets a unique instance ID.
+        Generate semantic mask using bounding box method.
+        Each character TYPE gets a consistent class ID.
         
         Args:
             image: Original image
             annotations: Character annotations
             
         Returns:
-            Instance segmentation mask
+            Semantic segmentation mask
         """
         height, width = self.image_size
         mask = np.zeros((height, width), dtype=np.int32)
@@ -99,10 +111,16 @@ class MaskGenerator:
         for ann in annotations:
             char = ann['character']
             
+            # Skip spaces (they remain background)
             if char == ' ':
                 continue
             
-            instance_id = ann['char_index'] + 1
+            # FIXED: Use character class ID instead of position-based ID
+            if char not in self.char_to_id:
+                print(f"Warning: Character '{char}' not in character set, skipping")
+                continue
+            
+            class_id = self.char_to_id[char]  # Same ID for all occurrences of this character
             
             x1, y1, x2, y2 = ann['bbox']
             
@@ -114,7 +132,8 @@ class MaskGenerator:
             if x2 <= x1 or y2 <= y1:
                 continue
             
-            mask[y1:y2, x1:x2] = instance_id
+            # Fill bounding box with character's CLASS ID
+            mask[y1:y2, x1:x2] = class_id
         
         if self.config.use_morphology:
             mask = self._apply_morphology(mask)
@@ -129,8 +148,8 @@ class MaskGenerator:
         font_size: int
     ) -> np.ndarray:
         """
-        Generate instance mask using template matching for pixel-perfect accuracy.
-        Each character gets a unique instance ID.
+        Generate semantic mask using template matching for pixel-perfect accuracy.
+        Each character TYPE gets a consistent class ID.
         
         Args:
             image: Original image (H, W, 3)
@@ -139,7 +158,7 @@ class MaskGenerator:
             font_size: Font size
             
         Returns:
-            Instance segmentation mask (H, W)
+            Semantic segmentation mask (H, W)
         """
         height, width = self.image_size
         mask = np.zeros((height, width), dtype=np.int32)
@@ -155,10 +174,16 @@ class MaskGenerator:
         for ann in annotations:
             char = ann['character']
             
+            # Skip spaces (they remain background)
             if char == ' ':
                 continue
             
-            instance_id = ann['char_index'] + 1
+            # FIXED: Use character class ID instead of position-based ID
+            if char not in self.char_to_id:
+                print(f"Warning: Character '{char}' not in character set, skipping")
+                continue
+            
+            class_id = self.char_to_id[char]  # Same ID for all occurrences of this character
             
             x1, y1, x2, y2 = ann['bbox']
             
@@ -180,7 +205,7 @@ class MaskGenerator:
             )
             
             if template is None or template.shape[0] == 0 or template.shape[1] == 0:
-                mask[y1:y2, x1:x2] = instance_id
+                mask[y1:y2, x1:x2] = class_id
                 continue
             
             char_mask = self._match_template_to_region(
@@ -188,9 +213,10 @@ class MaskGenerator:
             )
             
             if char_mask is not None:
-                mask[y1:y2, x1:x2] = np.where(char_mask > 0, instance_id, mask[y1:y2, x1:x2])
+                # FIXED: Fill with character CLASS ID (not instance ID)
+                mask[y1:y2, x1:x2] = np.where(char_mask > 0, class_id, mask[y1:y2, x1:x2])
             else:
-                mask[y1:y2, x1:x2] = instance_id
+                mask[y1:y2, x1:x2] = class_id
         
         if self.config.use_morphology:
             mask = self._apply_morphology(mask)
@@ -318,10 +344,11 @@ class MaskGenerator:
     
     def _apply_morphology(self, mask: np.ndarray) -> np.ndarray:
         """
-        Apply morphological operations to clean up instance mask.
+        Apply morphological operations to clean up semantic mask.
+        Preserves class IDs while cleaning boundaries.
         
         Args:
-            mask: Input instance mask
+            mask: Input semantic mask
             
         Returns:
             Cleaned mask
@@ -332,47 +359,47 @@ class MaskGenerator:
             (kernel_size, kernel_size)
         )
         
-        unique_instances = np.unique(mask)
+        unique_classes = np.unique(mask)
         result_mask = np.zeros_like(mask)
         
-        for instance_id in unique_instances:
-            if instance_id == 0:
+        for class_id in unique_classes:
+            if class_id == 0:
                 continue
             
-            instance_mask = (mask == instance_id).astype(np.uint8)
+            class_mask = (mask == class_id).astype(np.uint8)
             
-            instance_mask = cv2.morphologyEx(
-                instance_mask, 
+            class_mask = cv2.morphologyEx(
+                class_mask, 
                 cv2.MORPH_CLOSE, 
                 kernel
             )
             
-            result_mask[instance_mask > 0] = instance_id
+            result_mask[class_mask > 0] = class_id
         
         return result_mask
     
     def _fill_holes(self, mask: np.ndarray) -> np.ndarray:
         """
-        Fill holes in character instance masks.
+        Fill holes in character semantic masks.
         
         Args:
-            mask: Input instance mask
+            mask: Input semantic mask
             
         Returns:
             Mask with filled holes
         """
-        unique_instances = np.unique(mask)
+        unique_classes = np.unique(mask)
         result_mask = mask.copy()
         
-        for instance_id in unique_instances:
-            if instance_id == 0:
+        for class_id in unique_classes:
+            if class_id == 0:
                 continue
             
-            instance_mask = (mask == instance_id).astype(bool)
+            class_mask = (mask == class_id).astype(bool)
             
-            filled_mask = ndimage.binary_fill_holes(instance_mask)
+            filled_mask = ndimage.binary_fill_holes(class_mask)
             
-            result_mask[filled_mask] = instance_id
+            result_mask[filled_mask] = class_id
         
         return result_mask
     
@@ -382,20 +409,20 @@ class MaskGenerator:
         num_colors: Optional[int] = None
     ) -> np.ndarray:
         """
-        Create RGB visualization of instance segmentation mask.
-        Each instance gets a unique random color.
+        Create RGB visualization of semantic segmentation mask.
+        Each class gets a unique color.
         
         Args:
-            mask: Instance segmentation mask (H, W)
+            mask: Semantic segmentation mask (H, W)
             num_colors: Number of colors to use (None = auto)
             
         Returns:
             RGB visualization (H, W, 3)
         """
-        max_instance = mask.max()
+        max_class = mask.max()
         
         if num_colors is None:
-            num_colors = max_instance + 1
+            num_colors = max_class + 1
         
         np.random.seed(42)
         colors = np.random.randint(0, 255, size=(num_colors, 3), dtype=np.uint8)
@@ -403,18 +430,18 @@ class MaskGenerator:
         
         rgb_mask = np.zeros((*mask.shape, 3), dtype=np.uint8)
         
-        for instance_id in range(num_colors):
-            if instance_id < len(colors):
-                rgb_mask[mask == instance_id] = colors[instance_id]
+        for class_id in range(num_colors):
+            if class_id < len(colors):
+                rgb_mask[mask == class_id] = colors[class_id]
         
         return rgb_mask
     
     def save_mask(self, mask: np.ndarray, output_path: str) -> None:
         """
-        Save instance segmentation mask to file.
+        Save semantic segmentation mask to file.
         
         Args:
-            mask: Instance segmentation mask
+            mask: Semantic segmentation mask
             output_path: Output file path
         """
         output_path = Path(output_path)
@@ -425,13 +452,13 @@ class MaskGenerator:
     
     def load_mask(self, mask_path: str) -> np.ndarray:
         """
-        Load instance segmentation mask from file.
+        Load semantic segmentation mask from file.
         
         Args:
             mask_path: Path to mask file
             
         Returns:
-            Instance segmentation mask
+            Semantic segmentation mask
         """
         mask_img = Image.open(mask_path)
         mask = np.array(mask_img, dtype=np.int32)
@@ -440,33 +467,32 @@ class MaskGenerator:
     
     def get_mask_statistics(self, mask: np.ndarray) -> Dict:
         """
-        Compute statistics about instance segmentation mask.
+        Compute statistics about semantic segmentation mask.
         
         Args:
-            mask: Instance segmentation mask
+            mask: Semantic segmentation mask
             
         Returns:
             Dictionary with statistics
         """
-        unique_instances = np.unique(mask)
+        unique_classes = np.unique(mask)
         
-        num_instances = len(unique_instances) - 1 if 0 in unique_instances else len(unique_instances)
+        num_characters = np.sum(mask > 0)
+        
+        class_counts = {}
+        for class_id in unique_classes:
+            if class_id == 0:
+                continue
+            class_counts[int(class_id)] = int(np.sum(mask == class_id))
         
         total_pixels = mask.size
-        character_pixels = np.sum(mask > 0)
         background_pixels = np.sum(mask == 0)
         
-        instance_sizes = {}
-        for instance_id in unique_instances:
-            if instance_id == 0:
-                continue
-            instance_sizes[int(instance_id)] = int(np.sum(mask == instance_id))
-        
         return {
-            "num_characters": num_instances,
+            "num_classes": len(unique_classes) - 1,
+            "num_characters": int(num_characters),
             "total_pixels": total_pixels,
-            "character_pixels": int(character_pixels),
             "background_pixels": int(background_pixels),
-            "character_ratio": float(character_pixels / total_pixels),
-            "instance_sizes": instance_sizes
+            "character_ratio": float(num_characters / total_pixels),
+            "class_pixel_counts": class_counts
         }
